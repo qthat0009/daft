@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
+use async_stream::try_stream;
 use daft_core::prelude::SchemaRef;
 use daft_io::IOStatsRef;
 use daft_micropartition::MicroPartition;
+use daft_table::Table;
 use tracing::instrument;
 
 use super::source::Source;
@@ -31,10 +33,18 @@ impl Source for InMemorySource {
         _io_stats: IOStatsRef,
     ) -> crate::Result<SourceStream<'static>> {
         if self.data.is_empty() {
-            let empty = Arc::new(MicroPartition::empty(Some(self.schema.clone())));
-            return Ok(Box::pin(futures::stream::once(async { empty })));
+            let empty = vec![Table::empty(Some(self.schema.clone())); 1];
+            return Ok(Box::pin(futures::stream::once(async {
+                Ok(Arc::new(empty))
+            })));
         }
-        Ok(Box::pin(futures::stream::iter(self.data.clone())))
+        let data = self.data.clone();
+        let stream = try_stream! {
+            for mp in data {
+                yield mp.get_tables()?
+            }
+        };
+        Ok(Box::pin(stream))
     }
     fn name(&self) -> &'static str {
         "InMemory"

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use common_display::{tree::TreeDisplay, utils::bytes_to_human_readable};
+use common_error::DaftResult;
 use daft_io::{IOStatsContext, IOStatsRef};
-use daft_micropartition::MicroPartition;
+use daft_table::Table;
 use futures::{stream::BoxStream, StreamExt};
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
     ExecutionRuntimeHandle,
 };
 
-pub type SourceStream<'a> = BoxStream<'a, Arc<MicroPartition>>;
+pub type SourceStream<'a> = BoxStream<'a, DaftResult<Arc<Vec<Table>>>>;
 
 pub(crate) trait Source: Send + Sync {
     fn name(&self) -> &'static str;
@@ -81,7 +82,7 @@ impl PipelineNode for SourceNode {
         runtime_handle.spawn(
             async move {
                 while let Some(part) = source_stream.next().await {
-                    let _ = counting_sender.send(part.into()).await;
+                    let _ = counting_sender.send(part?.into()).await;
                 }
                 Ok(())
             },

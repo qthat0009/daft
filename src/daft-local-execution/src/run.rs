@@ -14,6 +14,7 @@ use common_error::DaftResult;
 use common_tracing::refresh_chrome_trace;
 use daft_micropartition::MicroPartition;
 use daft_physical_plan::{translate, LocalPhysicalPlan};
+use daft_table::Table;
 #[cfg(feature = "python")]
 use {
     common_daft_config::PyDaftExecutionConfig,
@@ -168,7 +169,7 @@ pub fn run_local(
     });
 
     struct ReceiverIterator {
-        receiver: Receiver<Arc<MicroPartition>>,
+        receiver: Receiver<Arc<Vec<Table>>>,
         handle: Option<std::thread::JoinHandle<DaftResult<()>>>,
     }
 
@@ -177,8 +178,14 @@ pub fn run_local(
 
         fn next(&mut self) -> Option<Self::Item> {
             match self.receiver.blocking_recv() {
-                Some(part) => Some(Ok(part)),
-                None => {
+                Some(part) if !part.is_empty() && !part.first().unwrap().is_empty() => {
+                    Some(Ok(Arc::new(MicroPartition::new_loaded(
+                        part.first().unwrap().schema.clone(),
+                        part,
+                        None,
+                    ))))
+                }
+                _ => {
                     if self.handle.is_some() {
                         let join_result = self
                             .handle

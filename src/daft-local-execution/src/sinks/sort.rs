@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use common_error::DaftResult;
 use daft_dsl::ExprRef;
-use daft_micropartition::MicroPartition;
+use daft_table::Table;
 use tracing::instrument;
 
 use super::blocking_sink::{BlockingSink, BlockingSinkStatus};
@@ -14,9 +14,9 @@ pub struct SortSink {
 }
 
 enum SortState {
-    Building(Vec<Arc<MicroPartition>>),
+    Building(Vec<Table>),
     #[allow(dead_code)]
-    Done(Arc<MicroPartition>),
+    Done(Table),
 }
 
 impl SortSink {
@@ -34,9 +34,11 @@ impl SortSink {
 
 impl BlockingSink for SortSink {
     #[instrument(skip_all, name = "SortSink::sink")]
-    fn sink(&mut self, input: &Arc<MicroPartition>) -> DaftResult<BlockingSinkStatus> {
+    fn sink(&mut self, input: &[Table]) -> DaftResult<BlockingSinkStatus> {
         if let SortState::Building(parts) = &mut self.state {
-            parts.push(input.clone());
+            for t in input {
+                parts.push(t.clone());
+            }
         } else {
             panic!("SortSink should be in Building state");
         }
@@ -50,11 +52,10 @@ impl BlockingSink for SortSink {
                 !parts.is_empty(),
                 "We can not finalize SortSink with no data"
             );
-            let concated =
-                MicroPartition::concat(&parts.iter().map(|x| x.as_ref()).collect::<Vec<_>>())?;
-            let sorted = Arc::new(concated.sort(&self.sort_by, &self.descending)?);
+            let concated = Table::concat(parts)?;
+            let sorted = concated.sort(&self.sort_by, &self.descending)?;
             self.state = SortState::Done(sorted.clone());
-            Ok(Some(sorted.into()))
+            Ok(Some(Arc::new(vec![sorted; 1]).into()))
         } else {
             panic!("SortSink should be in Building state");
         }
