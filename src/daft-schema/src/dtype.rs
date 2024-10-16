@@ -148,6 +148,9 @@ pub enum DataType {
     #[display("FixedShapeSparseTensor[{_0}; {_1:?}]")]
     FixedShapeSparseTensor(Box<DataType>, Vec<u64>),
 
+    /// A geometry type stored as wkb
+    Geometry,
+
     #[cfg(feature = "python")]
     Python,
 
@@ -279,7 +282,8 @@ impl DataType {
             | Self::Tensor(..)
             | Self::FixedShapeTensor(..)
             | Self::SparseTensor(..)
-            | Self::FixedShapeSparseTensor(..) => {
+            | Self::FixedShapeSparseTensor(..)
+            | Self::Geometry => {
                 let physical = Box::new(self.to_physical());
                 let logical_extension = Self::Extension(
                     DAFT_SUPER_EXTENSION_NAME.into(),
@@ -344,6 +348,7 @@ impl DataType {
                 Field::new("values", List(Box::new(*dtype.clone()))),
                 Field::new("indices", List(Box::new(Self::UInt64))),
             ]),
+            Geometry => List(Box::new(Self::UInt8)),
             _ => {
                 assert!(self.is_physical());
                 self.clone()
@@ -473,6 +478,11 @@ impl DataType {
     }
 
     #[inline]
+    pub fn is_geometry(&self) -> bool {
+        matches!(self, Self::Geometry)
+    }
+
+    #[inline]
     pub fn is_map(&self) -> bool {
         matches!(self, Self::Map { .. })
     }
@@ -598,6 +608,7 @@ impl DataType {
                 | Self::SparseTensor(..)
                 | Self::FixedShapeSparseTensor(..)
                 | Self::Map { .. }
+                | Self::Geometry
         )
     }
 

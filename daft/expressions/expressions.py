@@ -18,7 +18,7 @@ from typing import (
 
 import daft.daft as native
 from daft import context
-from daft.daft import CountMode, ImageFormat, ImageMode, ResourceRequest, bind_stateful_udfs
+from daft.daft import CountMode, GeoOperation, ImageFormat, ImageMode, ResourceRequest, bind_stateful_udfs
 from daft.daft import PyExpr as _PyExpr
 from daft.daft import col as _col
 from daft.daft import date_lit as _date_lit
@@ -216,6 +216,11 @@ class Expression:
     def image(self) -> ExpressionImageNamespace:
         """Access methods that work on columns of images"""
         return ExpressionImageNamespace.from_expression(self)
+
+    @property
+    def geo(self) -> ExpressionGeometryNamespace:
+        """Access methods that work on columns of geometries"""
+        return ExpressionGeometryNamespace.from_expression(self)
 
     @property
     def partitioning(self) -> ExpressionPartitioningNamespace:
@@ -3461,3 +3466,43 @@ class ExpressionEmbeddingNamespace(ExpressionNamespace):
     def cosine_distance(self, other: Expression) -> Expression:
         """Compute the cosine distance between two embeddings"""
         return Expression._from_pyexpr(native.cosine_distance(self._expr, other._expr))
+
+
+class ExpressionGeometryNamespace(ExpressionNamespace):
+    def decode(self, raise_on_error: bool = True) -> Expression:
+        """Decodes a WKB binary into a geometry object"""
+        return Expression._from_pyexpr(native.geo_decode(self._expr, raise_on_error))
+
+    def encode(self, text: bool = False, raise_on_error: bool = True) -> Expression:
+        """Encodes a geometry object into a WKB binary or WKT Text"""
+        return Expression._from_pyexpr(native.geo_encode(self._expr, text, raise_on_error))
+
+    def area(self) -> Expression:
+        """Compute the area of a geometry"""
+        op = GeoOperation.Area  # type: ignore[attr-defined]
+        return Expression._from_pyexpr(native.geo_op(self._expr, op))
+
+    def convex_hull(self) -> Expression:
+        """Compute the area of a geometry"""
+        op = GeoOperation.ConvexHull  # type: ignore[attr-defined]
+        return Expression._from_pyexpr(native.geo_op(self._expr, op))
+
+    def centroid(self) -> Expression:
+        """Compute the centroid of a geometry"""
+        op = GeoOperation.Centroid  # type: ignore[attr-defined]
+        return Expression._from_pyexpr(native.geo_op(self._expr, op))
+
+    def distance(self, rhs: Expression) -> Expression:
+        """Compute the distance between two geometries"""
+        op = GeoOperation.Distance  # type: ignore[attr-defined]
+        return Expression._from_pyexpr(native.geo_op_binary(self._expr, rhs._expr, op))
+
+    def intersects(self, rhs: Expression) -> Expression:
+        """Check if two geometries intersect"""
+        op = GeoOperation.Intersects  # type: ignore[attr-defined]
+        return Expression._from_pyexpr(native.geo_op_binary(self._expr, rhs._expr, op))
+
+    def intersection(self, rhs: Expression) -> Expression:
+        """Compute the intersection of two geometries"""
+        op: Callable = GeoOperation.Intersection  # type: ignore[attr-defined]
+        return Expression._from_pyexpr(native.geo_op_binary(self._expr, rhs._expr, op))
