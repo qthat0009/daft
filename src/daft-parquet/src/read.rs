@@ -11,11 +11,12 @@ use arrow2::{
     },
 };
 use common_error::DaftResult;
+use common_runtime::get_io_runtime;
 use daft_core::prelude::*;
 #[cfg(feature = "python")]
 use daft_core::python::PyTimeUnit;
 use daft_dsl::{optimization::get_required_columns, ExprRef};
-use daft_io::{get_runtime, parse_url, IOClient, IOStatsRef, SourceType};
+use daft_io::{parse_url, IOClient, IOStatsRef, SourceType};
 use daft_table::Table;
 use futures::{
     future::{join_all, try_join_all},
@@ -417,6 +418,7 @@ async fn stream_parquet_single(
             maintain_order,
             io_stats,
         )
+        .await
     } else {
         let builder = ParquetReaderBuilder::from_uri(
             uri.as_str(),
@@ -674,7 +676,7 @@ pub fn read_parquet(
     schema_infer_options: ParquetSchemaInferenceOptions,
     metadata: Option<Arc<FileMetaData>>,
 ) -> DaftResult<Table> {
-    let runtime_handle = daft_io::get_runtime(multithreaded_io)?;
+    let runtime_handle = get_io_runtime(multithreaded_io);
 
     runtime_handle.block_on_current_thread(async {
         read_parquet_single(
@@ -696,9 +698,8 @@ pub fn read_parquet(
     })
 }
 pub type ArrowChunk = Vec<Box<dyn arrow2::array::Array>>;
-pub type ArrowChunkIters = Vec<
-    Box<dyn Iterator<Item = arrow2::error::Result<Box<dyn arrow2::array::Array>>> + Send + Sync>,
->;
+pub type ArrowChunkIter =
+    Box<dyn Iterator<Item = arrow2::error::Result<Box<dyn arrow2::array::Array>>> + Send + Sync>;
 pub type ParquetPyarrowChunk = (arrow2::datatypes::SchemaRef, Vec<ArrowChunk>, usize);
 #[allow(clippy::too_many_arguments)]
 pub fn read_parquet_into_pyarrow(
@@ -713,7 +714,7 @@ pub fn read_parquet_into_pyarrow(
     schema_infer_options: ParquetSchemaInferenceOptions,
     file_timeout_ms: Option<i64>,
 ) -> DaftResult<ParquetPyarrowChunk> {
-    let runtime_handle = daft_io::get_runtime(multithreaded_io)?;
+    let runtime_handle = get_io_runtime(multithreaded_io);
     runtime_handle.block_on_current_thread(async {
         let fut = read_parquet_single_into_arrow(
             uri,
@@ -760,7 +761,7 @@ pub fn read_parquet_bulk<T: AsRef<str>>(
     delete_map: Option<HashMap<String, Vec<i64>>>,
     chunk_size: Option<usize>,
 ) -> DaftResult<Vec<Table>> {
-    let runtime_handle = daft_io::get_runtime(multithreaded_io)?;
+    let runtime_handle = get_io_runtime(multithreaded_io);
 
     let columns = columns.map(|s| s.iter().map(|v| v.as_ref().to_string()).collect::<Vec<_>>());
     if let Some(ref row_groups) = row_groups {
@@ -903,7 +904,7 @@ pub fn read_parquet_into_pyarrow_bulk<T: AsRef<str>>(
     multithreaded_io: bool,
     schema_infer_options: ParquetSchemaInferenceOptions,
 ) -> DaftResult<Vec<ParquetPyarrowChunk>> {
-    let runtime_handle = get_runtime(multithreaded_io)?;
+    let runtime_handle = get_io_runtime(multithreaded_io);
     let columns = columns.map(|s| s.iter().map(|v| v.as_ref().to_string()).collect::<Vec<_>>());
     if let Some(ref row_groups) = row_groups {
         if row_groups.len() != uris.len() {
@@ -960,7 +961,7 @@ pub fn read_parquet_schema(
     schema_inference_options: ParquetSchemaInferenceOptions,
     field_id_mapping: Option<Arc<BTreeMap<i32, Field>>>,
 ) -> DaftResult<(Schema, FileMetaData)> {
-    let runtime_handle = get_runtime(true)?;
+    let runtime_handle = get_io_runtime(true);
     let builder = runtime_handle.block_on_current_thread(async {
         ParquetReaderBuilder::from_uri(uri, io_client.clone(), io_stats, field_id_mapping).await
     })?;
@@ -1015,7 +1016,7 @@ pub fn read_parquet_statistics(
     io_stats: Option<IOStatsRef>,
     field_id_mapping: Option<Arc<BTreeMap<i32, Field>>>,
 ) -> DaftResult<Table> {
-    let runtime_handle = get_runtime(true)?;
+    let runtime_handle = get_io_runtime(true);
 
     if uris.data_type() != &DataType::Utf8 {
         return Err(common_error::DaftError::ValueError(format!(
@@ -1109,7 +1110,7 @@ mod tests {
 
     use super::*;
 
-    const PARQUET_FILE: &str = "s3://daft-public-data/test_fixtures/parquet-dev/mvp.parquet";
+    const PARQUET_FILE: &str = "s3://daft-public-data/benchmarking/lineitem-parquet/108417bd-5bee-43d9-bf9a-d6faec6afb2d-0.parquet";
     const PARQUET_FILE_LOCAL: &str = "tests/assets/parquet-data/mvp.parquet";
 
     fn get_local_parquet_path() -> String {
@@ -1141,7 +1142,7 @@ mod tests {
             Default::default(),
             None,
         )?;
-        assert_eq!(table.len(), 100);
+        assert_eq!(table.len(), 18751674);
 
         Ok(())
     }
@@ -1154,7 +1155,7 @@ mod tests {
         io_config.s3.anonymous = true;
 
         let io_client = Arc::new(IOClient::new(io_config.into())?);
-        let runtime_handle = daft_io::get_runtime(true)?;
+        let runtime_handle = get_io_runtime(true);
         runtime_handle.block_on_current_thread(async move {
             let tables = stream_parquet(
                 file,
@@ -1176,7 +1177,7 @@ mod tests {
             .into_iter()
             .collect::<DaftResult<Vec<_>>>()?;
             let total_tables_len = tables.iter().map(|t| t.len()).sum::<usize>();
-            assert_eq!(total_tables_len, 100);
+            assert_eq!(total_tables_len, 18751674);
             Ok(())
         })
     }
@@ -1187,9 +1188,9 @@ mod tests {
 
         let io_config = IOConfig::default();
         let io_client = Arc::new(IOClient::new(io_config.into())?);
-        let runtime_handle = daft_io::get_runtime(true)?;
+        let runtime_handle = get_io_runtime(true);
 
-        runtime_handle.block_on_io_pool(async move {
+        runtime_handle.block_on(async move {
             let metadata = read_parquet_metadata(&file, io_client, None, None).await?;
             let serialized = bincode::serialize(&metadata).unwrap();
             let deserialized = bincode::deserialize::<FileMetaData>(&serialized).unwrap();
@@ -1214,9 +1215,9 @@ mod tests {
         .into();
         let io_config = IOConfig::default();
         let io_client = Arc::new(IOClient::new(io_config.into()).unwrap());
-        let runtime_handle = daft_io::get_runtime(true).unwrap();
+        let runtime_handle = get_io_runtime(true);
         let file_metadata = runtime_handle
-            .block_on_io_pool({
+            .block_on({
                 let parquet = parquet.clone();
                 let io_client = io_client.clone();
                 async move { read_parquet_metadata(&parquet, io_client, None, None).await }

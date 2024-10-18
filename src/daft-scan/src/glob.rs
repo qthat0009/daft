@@ -2,9 +2,10 @@ use std::{sync::Arc, vec};
 
 use common_error::{DaftError, DaftResult};
 use common_file_formats::{CsvSourceConfig, FileFormat, FileFormatConfig, ParquetSourceConfig};
+use common_runtime::io::IORuntimeRef;
 use daft_core::{prelude::Utf8Array, series::IntoSeries};
 use daft_csv::CsvParseOptions;
-use daft_io::{parse_url, FileMetadata, IOClient, IOStatsContext, IOStatsRef, RuntimeRef};
+use daft_io::{parse_url, FileMetadata, IOClient, IOStatsContext, IOStatsRef};
 use daft_parquet::read::ParquetSchemaInferenceOptions;
 use daft_schema::{dtype::DataType, field::Field, schema::SchemaRef};
 use daft_stats::PartitionSpec;
@@ -29,7 +30,7 @@ pub struct GlobScanOperator {
 /// Wrapper struct that implements a sync Iterator for a BoxStream
 struct BoxStreamIterator<'a, T> {
     boxstream: BoxStream<'a, T>,
-    runtime_handle: RuntimeRef,
+    runtime_handle: IORuntimeRef,
 }
 
 impl<'a, T> Iterator for BoxStreamIterator<'a, T> {
@@ -68,7 +69,7 @@ fn run_glob(
     glob_path: &str,
     limit: Option<usize>,
     io_client: Arc<IOClient>,
-    runtime: RuntimeRef,
+    runtime: IORuntimeRef,
     io_stats: Option<IOStatsRef>,
     file_format: FileFormat,
 ) -> DaftResult<FileInfoIterator> {
@@ -93,7 +94,7 @@ fn run_glob(
 fn run_glob_parallel(
     glob_paths: Vec<String>,
     io_client: Arc<IOClient>,
-    runtime: RuntimeRef,
+    runtime: IORuntimeRef,
     io_stats: Option<IOStatsRef>,
     file_format: FileFormat,
 ) -> DaftResult<impl Iterator<Item = DaftResult<FileMetadata>>> {
