@@ -33,6 +33,7 @@ daft-sql = {path = "src/daft-sql", default-features = false}
 daft-stats = {path = "src/daft-stats", default-features = false}
 daft-table = {path = "src/daft-table", default-features = false}
 daft-writers = {path = "src/daft-writers", default-features = false}
+io-backends-aws = {path = "src/io-backends/aws", default-features = false}
 lazy_static = {workspace = true}
 log = {workspace = true}
 lzma-sys = {version = "*", features = ["static"]}
@@ -148,6 +149,7 @@ members = [
   "src/daft-hash",
   "src/daft-image",
   "src/daft-io",
+  "src/io-backends/aws",
   "src/daft-json",
   "src/daft-local-execution",
   "src/daft-local-plan",

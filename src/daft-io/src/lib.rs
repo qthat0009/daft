@@ -11,13 +11,14 @@ mod object_io;
 mod object_store_glob;
 mod s3_like;
 mod stats;
-mod stream_utils;
+pub mod stream_utils;
 
 use azure_blob::AzureBlobSource;
-use common_file_formats::FileFormat;
+pub use common_file_formats::FileFormat;
 use google_cloud::GCSSource;
 use huggingface::HFSource;
 use lazy_static::lazy_static;
+pub use object_store_glob::glob as glob_util;
 #[cfg(feature = "python")]
 pub mod python;
 
@@ -27,7 +28,9 @@ use common_error::{DaftError, DaftResult};
 pub use common_io_config::{AzureConfig, IOConfig, S3Config};
 use futures::stream::BoxStream;
 use object_io::StreamingRetryParams;
-pub use object_io::{FileMetadata, GetResult};
+pub use object_io::{
+    FileMetadata, FileType, GetResult, LSResult, ObjectSource, ObjectSourceFactory,
+};
 #[cfg(feature = "python")]
 pub use python::register_modules;
 use s3_like::S3LikeSource;
@@ -35,8 +38,7 @@ use snafu::{prelude::*, Snafu};
 pub use stats::{IOStatsContext, IOStatsRef};
 use url::ParseError;
 
-use self::{http::HttpSource, local::LocalSource, object_io::ObjectSource};
-
+use self::{http::HttpSource, local::LocalSource};
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("Generic {} error: {}", store, source))]
@@ -177,7 +179,23 @@ impl From<Error> for std::io::Error {
     }
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+pub struct ObjectSourceFactoryEntry {
+    source_type: SourceType,
+    factory: &'static dyn ObjectSourceFactory,
+}
+
+impl ObjectSourceFactoryEntry {
+    pub const fn new(source_type: SourceType, factory: &'static dyn ObjectSourceFactory) -> Self {
+        Self {
+            source_type,
+            factory,
+        }
+    }
+}
+
+inventory::collect!(ObjectSourceFactoryEntry);
 
 #[derive(Default)]
 pub struct IOClient {

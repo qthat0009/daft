@@ -1884,6 +1884,7 @@ dependencies = [
  "daft-stats",
  "daft-table",
  "daft-writers",
+ "io-backends-aws",
  "lazy_static",
  "libc",
  "log",
@@ -2129,6 +2130,7 @@ dependencies = [
  "home",
  "hyper 0.14.30",
  "hyper-tls 0.5.0",
+ "inventory",
  "itertools 0.11.0",
  "lazy_static",
  "log",
@@ -3696,6 +3698,34 @@ name = "inventory"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f958d3d68f4167080a18141e10381e7634563984a537f2a49a30fd8e53ac5767"
+
+[[package]]
+name = "io-backends-aws"
+version = "0.3.0-dev0"
+dependencies = [
+ "async-recursion",
+ "async-trait",
+ "aws-config",
+ "aws-credential-types",
+ "aws-sdk-s3",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "bytes",
+ "common-io-config",
+ "common-runtime",
+ "daft-io",
+ "futures",
+ "hyper 0.14.30",
+ "hyper-tls 0.5.0",
+ "inventory",
+ "log",
+ "md5",
+ "rand 0.8.5",
+ "snafu",
+ "tokio",
+ "url",
+]
 
 [[package]]
 name = "ipnet"
