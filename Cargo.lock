@@ -1934,6 +1934,7 @@ dependencies = [
  "arrow2",
  "async-stream",
  "common-daft-config",
+ "common-file-formats",
  "daft-core",
  "daft-dsl",
  "daft-local-execution",
