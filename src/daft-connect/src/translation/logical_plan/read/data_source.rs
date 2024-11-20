@@ -1,9 +1,11 @@
 use daft_logical_plan::LogicalPlanBuilder;
-use daft_scan::builder::ParquetScanBuilder;
+use daft_scan::builder::{CsvScanBuilder, ParquetScanBuilder};
 use eyre::{bail, ensure, WrapErr};
 use tracing::warn;
 
-pub fn data_source(data_source: spark_connect::read::DataSource) -> eyre::Result<LogicalPlanBuilder> {
+pub fn data_source(
+    data_source: spark_connect::read::DataSource,
+) -> eyre::Result<LogicalPlanBuilder> {
     let spark_connect::read::DataSource {
         format,
         schema,
@@ -15,10 +17,6 @@ pub fn data_source(data_source: spark_connect::read::DataSource) -> eyre::Result
     let Some(format) = format else {
         bail!("Format is required");
     };
-
-    if format != "parquet" {
-        bail!("Unsupported format: {format}; only parquet is supported");
-    }
 
     ensure!(!paths.is_empty(), "Paths are required");
 
@@ -34,9 +32,21 @@ pub fn data_source(data_source: spark_connect::read::DataSource) -> eyre::Result
         warn!("Ignoring predicates: {predicates:?}; not yet implemented");
     }
 
-    let builder = ParquetScanBuilder::new(paths)
-        .finish()
-        .wrap_err("Failed to create parquet scan builder")?;
+    let plan = match &*format {
+        "parquet" => ParquetScanBuilder::new(paths)
+            .finish()
+            .wrap_err("Failed to create parquet scan builder")?,
+        "csv" => CsvScanBuilder::new(paths)
+            .finish()
+            .wrap_err("Failed to create csv scan builder")?,
+        "json" => {
+            // todo(completeness): implement json reading
+            bail!("json reading is not yet implemented");
+        }
+        other => {
+            bail!("Unsupported format: {other}; only parquet and csv are supported");
+        }
+    };
 
-    Ok(builder)
+    Ok(plan)
 }

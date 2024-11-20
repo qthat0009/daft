@@ -6,14 +6,13 @@ use eyre::{bail, WrapErr};
 use futures::stream;
 use spark_connect::{
     write_operation::{SaveMode, SaveType},
-    ExecutePlanResponse, Relation, WriteOperation,
+    ExecutePlanResponse, WriteOperation,
 };
 use tokio_util::sync::CancellationToken;
 use tonic::{codegen::tokio_stream::wrappers::ReceiverStream, Status};
 use tracing::warn;
 
 use crate::{
-    invalid_argument_err,
     op::execute::{ExecuteStream, PlanIds},
     session::Session,
     translation,
@@ -100,9 +99,12 @@ impl Session {
                     bail!("Source is required");
                 };
 
-                if source != "parquet" {
-                    bail!("Unsupported source: {source}; only parquet is supported");
-                }
+                let file_format = match &*source {
+                    "parquet" => FileFormat::Parquet,
+                    "csv" => FileFormat::Csv,
+                    "json" => FileFormat::Json,
+                    _ => bail!("Unsupported source: {source}; only parquet and csv are supported"),
+                };
 
                 let Ok(mode) = SaveMode::try_from(mode) else {
                     bail!("Invalid save mode: {mode}");
@@ -146,7 +148,7 @@ impl Session {
                 }
 
                 let Some(save_type) = save_type else {
-                    return bail!("Save type is required");
+                    bail!("Save type is required");
                 };
 
                 let path = match save_type {
@@ -160,7 +162,7 @@ impl Session {
                 let plan = translation::to_logical_plan(input)?;
 
                 let plan = plan
-                    .table_write(&path, FileFormat::Parquet, None, None, None)
+                    .table_write(&path, file_format, None, None, None)
                     .wrap_err("Failed to create table write plan")?;
 
                 let logical_plan = plan.build();
@@ -177,9 +179,7 @@ impl Session {
                     CancellationToken::new(), // todo: maybe implement cancelling
                 )?;
 
-                for _ignored in iterator {
-
-                }
+                for _ignored in iterator {}
 
                 // this is so we make sure the operation is actually done
                 // before we return
