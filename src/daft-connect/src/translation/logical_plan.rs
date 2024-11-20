@@ -3,11 +3,15 @@ use eyre::{bail, Context};
 use spark_connect::{relation::RelType, Limit, Relation};
 use tracing::warn;
 
-use crate::translation::logical_plan::{aggregate::aggregate, project::project, range::range};
+use crate::translation::logical_plan::{
+    aggregate::aggregate, project::project, range::range, to_df::to_df,
+};
 
 mod aggregate;
+mod local_relation;
 mod project;
 mod range;
+mod to_df;
 
 pub fn to_logical_plan(relation: Relation) -> eyre::Result<LogicalPlanBuilder> {
     if let Some(common) = relation.common {
@@ -24,6 +28,10 @@ pub fn to_logical_plan(relation: Relation) -> eyre::Result<LogicalPlanBuilder> {
         RelType::Project(p) => project(*p).wrap_err("Failed to apply project to logical plan"),
         RelType::Aggregate(a) => {
             aggregate(*a).wrap_err("Failed to apply aggregate to logical plan")
+        }
+        RelType::ToDf(t) => to_df(*t).wrap_err("Failed to apply to_df to logical plan"),
+        RelType::LocalRelation(l) => {
+            local_relation(*l).wrap_err("Failed to apply local_relation to logical plan")
         }
         plan => bail!("Unsupported relation type: {plan:?}"),
     }
