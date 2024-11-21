@@ -4,11 +4,12 @@ use spark_connect::{relation::RelType, Limit, Relation};
 use tracing::warn;
 
 use crate::translation::logical_plan::{
-    aggregate::aggregate, project::project, range::range, set_op::set_op,
+    aggregate::aggregate, deduplicate::deduplicate, project::project, range::range, set_op::set_op,
     with_columns::with_columns,
 };
 
 mod aggregate;
+mod deduplicate;
 mod project;
 mod range;
 mod set_op;
@@ -34,6 +35,9 @@ pub fn to_logical_plan(relation: Relation) -> eyre::Result<LogicalPlanBuilder> {
             with_columns(*w).wrap_err("Failed to apply with_columns to logical plan")
         }
         RelType::SetOp(s) => set_op(*s).wrap_err("Failed to apply set_op to logical plan"),
+        RelType::Deduplicate(d) => {
+            deduplicate(*d).wrap_err("Failed to apply deduplicate to logical plan")
+        }
         plan => bail!("Unsupported relation type: {plan:?}"),
     }
 }
