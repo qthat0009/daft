@@ -3,9 +3,12 @@ use eyre::{bail, Context};
 use spark_connect::{relation::RelType, Limit, Relation};
 use tracing::warn;
 
-use crate::translation::logical_plan::{aggregate::aggregate, project::project, range::range};
+use crate::translation::logical_plan::{
+    aggregate::aggregate, filter::filter, project::project, range::range,
+};
 
 mod aggregate;
+mod filter;
 mod project;
 mod range;
 
@@ -22,6 +25,7 @@ pub fn to_logical_plan(relation: Relation) -> eyre::Result<LogicalPlanBuilder> {
         RelType::Limit(l) => limit(*l).wrap_err("Failed to apply limit to logical plan"),
         RelType::Range(r) => range(r).wrap_err("Failed to apply range to logical plan"),
         RelType::Project(p) => project(*p).wrap_err("Failed to apply project to logical plan"),
+        RelType::Filter(f) => filter(*f).wrap_err("Failed to apply filter to logical plan"),
         RelType::Aggregate(a) => {
             aggregate(*a).wrap_err("Failed to apply aggregate to logical plan")
         }
