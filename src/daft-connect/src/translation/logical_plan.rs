@@ -5,7 +5,7 @@ use tracing::warn;
 
 use crate::translation::logical_plan::{
     aggregate::aggregate, project::project, range::range, set_op::set_op,
-    with_columns::with_columns,
+    with_columns::with_columns, with_columns_renamed::with_columns_renamed,
 };
 
 mod aggregate;
@@ -13,6 +13,7 @@ mod project;
 mod range;
 mod set_op;
 mod with_columns;
+mod with_columns_renamed;
 
 pub fn to_logical_plan(relation: Relation) -> eyre::Result<LogicalPlanBuilder> {
     if let Some(common) = relation.common {
@@ -33,6 +34,8 @@ pub fn to_logical_plan(relation: Relation) -> eyre::Result<LogicalPlanBuilder> {
         RelType::WithColumns(w) => {
             with_columns(*w).wrap_err("Failed to apply with_columns to logical plan")
         }
+        RelType::WithColumnsRenamed(w) => with_columns_renamed(*w)
+            .wrap_err("Failed to apply with_columns_renamed to logical plan"),
         RelType::SetOp(s) => set_op(*s).wrap_err("Failed to apply set_op to logical plan"),
         plan => bail!("Unsupported relation type: {plan:?}"),
     }
