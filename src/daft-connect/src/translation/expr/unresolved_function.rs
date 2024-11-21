@@ -32,6 +32,8 @@ pub fn unresolved_to_daft_expr(f: &UnresolvedFunction) -> eyre::Result<daft_dsl:
             .wrap_err("Failed to handle <= function"),
         ">=" => handle_binary_op(arguments, daft_dsl::Operator::GtEq)
             .wrap_err("Failed to handle >= function"),
+        "and" => handle_binary_op(arguments, daft_dsl::Operator::And)
+            .wrap_err("Failed to handle and function"),
         "isnotnull" => handle_isnotnull(arguments).wrap_err("Failed to handle isnotnull function"),
         "isnull" => handle_isnull(arguments).wrap_err("Failed to handle isnull function"),
         n => bail!("Unresolved function {n} not yet supported"),
