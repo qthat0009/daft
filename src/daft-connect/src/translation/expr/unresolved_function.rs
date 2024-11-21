@@ -53,8 +53,6 @@ pub fn handle_sum(arguments: Vec<daft_dsl::ExprRef>) -> eyre::Result<daft_dsl::E
     Ok(arg.sum())
 }
 
-
-
 pub fn handle_binary_op(
     arguments: Vec<daft_dsl::ExprRef>,
     op: daft_dsl::Operator,
