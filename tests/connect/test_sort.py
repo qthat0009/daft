@@ -11,6 +11,6 @@ def test_sort(spark_session):
     df_sorted = df.sort(col("id").desc())
 
     # Verify the DataFrame is sorted correctly
-    df_pandas = df.toPandas()
-    df_sorted_pandas = df_sorted.toPandas()
-    assert df_sorted_pandas["id"].equals(df_pandas["id"].sort_values(ascending=False).reset_index(drop=True)), "Data should be sorted in descending order"
+    actual =  df.to_arrow().to_pydict() # or df.toPandas().to_dict()
+    expected = daft.from_pydict({"id": list(range(10))}).sort("id", descending=True).to_pydict()
+    assert actual == expected
