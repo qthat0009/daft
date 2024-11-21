@@ -3,11 +3,14 @@ use eyre::{bail, Context};
 use spark_connect::{relation::RelType, Limit, Relation};
 use tracing::warn;
 
-use crate::translation::logical_plan::{aggregate::aggregate, project::project, range::range};
+use crate::translation::logical_plan::{
+    aggregate::aggregate, project::project, range::range, with_columns::with_columns,
+};
 
 mod aggregate;
 mod project;
 mod range;
+mod with_columns;
 
 pub fn to_logical_plan(relation: Relation) -> eyre::Result<LogicalPlanBuilder> {
     if let Some(common) = relation.common {
@@ -24,6 +27,9 @@ pub fn to_logical_plan(relation: Relation) -> eyre::Result<LogicalPlanBuilder> {
         RelType::Project(p) => project(*p).wrap_err("Failed to apply project to logical plan"),
         RelType::Aggregate(a) => {
             aggregate(*a).wrap_err("Failed to apply aggregate to logical plan")
+        }
+        RelType::WithColumns(w) => {
+            with_columns(*w).wrap_err("Failed to apply with_columns to logical plan")
         }
         plan => bail!("Unsupported relation type: {plan:?}"),
     }
