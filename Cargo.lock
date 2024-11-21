@@ -1931,6 +1931,7 @@ dependencies = [
 name = "daft-connect"
 version = "0.3.0-dev0"
 dependencies = [
+ "arrow-format",
  "arrow2",
  "async-stream",
  "common-daft-config",
@@ -1945,6 +1946,7 @@ dependencies = [
  "eyre",
  "futures",
  "pyo3",
+ "serde_json",
  "spark-connect",
  "tokio",
  "tonic",

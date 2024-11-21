@@ -1,4 +1,7 @@
-use arrow2::io::ipc::write::StreamWriter;
+use arrow2::io::ipc::{
+    read::{StreamMetadata, StreamReader},
+    write::StreamWriter,
+};
 use daft_table::Table;
 use eyre::Context;
 use spark_connect::{

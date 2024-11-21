@@ -1,5 +1,6 @@
 [dependencies]
 arrow2 = {workspace = true}
+arrow-format = {workspace = true}
 async-stream = "0.3.6"
 common-daft-config = {workspace = true}
 daft-core = {workspace = true}
@@ -13,6 +14,7 @@ dashmap = "6.1.0"
 eyre = "0.6.12"
 futures = "0.3.31"
 pyo3 = {workspace = true, optional = true}
+serde_json = {workspace = true}
 spark-connect = {workspace = true}
 tokio = {version = "1.40.0", features = ["full"]}
 tonic = "0.12.3"
