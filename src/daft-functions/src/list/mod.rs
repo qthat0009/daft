@@ -1,4 +1,5 @@
 mod chunk;
+pub mod contains;
 mod count;
 mod explode;
 mod get;
@@ -12,6 +13,7 @@ mod sum;
 mod value_counts;
 
 pub use chunk::{list_chunk as chunk, ListChunk};
+pub use contains::{list_contains as contains, ListContains};
 pub use count::{list_count as count, ListCount};
 pub use explode::{explode, Explode};
 pub use get::{list_get as get, ListGet};
@@ -36,7 +38,6 @@ pub fn register_modules(parent: &Bound<PyModule>) -> PyResult<()> {
         value_counts::py_list_value_counts,
         parent
     )?)?;
-
     parent.add_function(wrap_pyfunction_bound!(max::py_list_max, parent)?)?;
     parent.add_function(wrap_pyfunction_bound!(min::py_list_min, parent)?)?;
     parent.add_function(wrap_pyfunction_bound!(mean::py_list_mean, parent)?)?;
@@ -44,6 +45,7 @@ pub fn register_modules(parent: &Bound<PyModule>) -> PyResult<()> {
     parent.add_function(wrap_pyfunction_bound!(slice::py_list_slice, parent)?)?;
     parent.add_function(wrap_pyfunction_bound!(sum::py_list_sum, parent)?)?;
     parent.add_function(wrap_pyfunction_bound!(sort::py_list_sort, parent)?)?;
+    parent.add_function(wrap_pyfunction_bound!(contains::py_list_contains, parent)?)?;
 
     Ok(())
 }

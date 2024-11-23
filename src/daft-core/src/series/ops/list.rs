@@ -175,4 +175,20 @@ impl Series {
             ))),
         }
     }
+
+    pub fn list_contains(&self, values: &Self) -> DaftResult<Self> {
+        let values = values.as_physical()?;
+        let series = match self.data_type() {
+            DataType::List(_) => self.list()?.list_contains(values),
+            DataType::FixedSizeList(..) => self.fixed_size_list()?.list_contains(values),
+            dt => {
+                return Err(DaftError::TypeError(format!(
+                    "List contains not implemented for {}",
+                    dt
+                )))
+            }
+        }?
+        .into_series();
+        Ok(series)
+    }
 }
