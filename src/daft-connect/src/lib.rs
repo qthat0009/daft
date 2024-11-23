@@ -190,8 +190,9 @@ impl SparkConnectService for DaftSparkConnectService {
                     CommandType::RegisterFunction(_) => {
                         unimplemented_err!("RegisterFunction not implemented")
                     }
-                    CommandType::WriteOperation(_) => {
-                        unimplemented_err!("WriteOperation not implemented")
+                    CommandType::WriteOperation(op) => {
+                        let result = session.handle_write_command(op, operation).await?;
+                        return Ok(Response::new(result))
                     }
                     CommandType::CreateDataframeView(_) => {
                         unimplemented_err!("CreateDataframeView not implemented")
