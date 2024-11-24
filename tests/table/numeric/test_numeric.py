@@ -363,6 +363,185 @@ def test_table_round_bad_input() -> None:
         table.eval_expression_list([col("a").round(-2)])
 
 
+def test_clip_one_sided_bounding():
+    table = MicroPartition.from_pydict({"a": [1, 2, 3, 4, 5]})
+    clip_table = table.eval_expression_list([col("a").clip(None, 3)])
+    expected = [1, 2, 3, 3, 3]
+    assert clip_table.get_column("a").to_pylist() == expected
+
+    clip_table = table.eval_expression_list([col("a").clip(3, None)])
+    expected = [3, 3, 3, 4, 5]
+    assert clip_table.get_column("a").to_pylist() == expected
+
+
+def test_clip_integer_float_promotion():
+    table = MicroPartition.from_pydict({"a": [1, 2, 3, 4, 5]})
+    clip_table = table.eval_expression_list([col("a").clip(2.5, 4.5)])
+    expected = [2.5, 2.5, 3, 4, 4.5]
+    assert clip_table.get_column("a").to_pylist() == expected
+
+
+def test_clip_zero_handling():
+    table = MicroPartition.from_pydict({"a": [-0.0, 0.0, 1.0, -1.0]})
+    clip_table = table.eval_expression_list([col("a").clip(-0.5, 0.5)])
+    expected = [-0.0, 0.0, 0.5, -0.5]
+    assert clip_table.get_column("a").to_pylist() == expected
+
+
+def test_clip_empty_array():
+    table = MicroPartition.from_pydict({"a": []})
+    with pytest.raises(ValueError):
+        table.eval_expression_list([col("a").clip(0, 1)])
+
+
+def test_clip_all_within_bounds():
+    table = MicroPartition.from_pydict({"a": [2, 3, 4]})
+    clip_table = table.eval_expression_list([col("a").clip(1, 5)])
+    expected = [2, 3, 4]
+    assert clip_table.get_column("a").to_pylist() == expected
+
+
+def test_clip_all_out_of_bounds():
+    table = MicroPartition.from_pydict({"a": [0, 1, 2, 3, 4, 5]})
+    clip_table = table.eval_expression_list([col("a").clip(2, 3)])
+    expected = [2, 2, 2, 3, 3, 3]
+    assert clip_table.get_column("a").to_pylist() == expected
+
+
+def test_clip_nan_handling():
+    table = MicroPartition.from_pydict({"a": [1, 2, np.nan, 4, 5]})
+    clip_table = table.eval_expression_list([col("a").clip(2, 4)])
+    expected = [2, 2, np.nan, 4, 4]
+    actual = clip_table.get_column("a").to_pylist()
+    assert all((a == b or (np.isnan(a) and np.isnan(b))) for a, b in zip(actual, expected))
+
+
+def test_clip_column_with_scalar():
+    # Initialize the table with data, lower bounds, and upper bounds
+    table = MicroPartition.from_pydict(
+        {
+            "data": [1.0, 2.5, None, 4.7, 5.0, float("nan")],
+            "lower_bound": [0.5, 2.0, 1.0, None, 4.0, 0.0],
+            "upper_bound": [2.0, 3.0, 5.0, None, None, float("inf")],
+        }
+    )
+
+    # Clip with column lower bound and scalar upper bound (5)
+    clip_table = table.eval_expression_list([col("data").clip(col("lower_bound"), 5)])
+    expected = [
+        1.0,  # 1.0 clipped between 0.5 and 5 -> 1.0
+        2.5,  # 2.5 clipped between 2.0 and 5 -> 2.5
+        None,  # data is None
+        4.7,  # lower_bound is None, no lower bound applied
+        5.0,  # 5.0 clipped between 4.0 and 5 -> 5.0
+        float("nan"),  # data is NaN
+    ]
+    actual = clip_table.get_column("data").to_pylist()
+    assert all(
+        (a == b) or (a is None and b is None) or (math.isnan(a) and math.isnan(b)) for a, b in zip(actual, expected)
+    ), f"Expected {expected}, got {actual}"
+
+    # Clip with scalar lower bound (2.0) and column upper bound
+    clip_table = table.eval_expression_list([col("data").clip(2.0, col("upper_bound"))])
+    expected = [
+        2.0,  # 1.0 clipped to 2.0 (upper_bound is 2.0)
+        2.5,  # 2.5 remains (between 2.0 and 3.0)
+        None,  # data is None
+        4.7,  # upper_bound is None, no upper bound applied
+        5.0,  # 5.0 remains (upper_bound is None)
+        float("nan"),  # data is NaN
+    ]
+    actual = clip_table.get_column("data").to_pylist()
+    assert all(
+        (a == b) or (a is None and b is None) or (math.isnan(a) and math.isnan(b)) for a, b in zip(actual, expected)
+    ), f"Expected {expected}, got {actual}"
+
+    # Clip with column lower bound and column upper bound
+    clip_table = table.eval_expression_list([col("data").clip(col("lower_bound"), col("upper_bound"))])
+    expected = [
+        1.0,  # Clipped between 0.5 and 2.0 -> 1.0
+        2.5,  # Clipped between 2.0 and 3.0 -> 2.5
+        None,  # data is None
+        4.7,  # lower and upper bounds are None, data remains unchanged
+        5.0,  # Clipped between 4.0 and 5.0 -> 5.0
+        float("nan"),  # data is NaN
+    ]
+    actual = clip_table.get_column("data").to_pylist()
+    assert all(
+        (a == b) or (a is None and b is None) or (math.isnan(a) and math.isnan(b)) for a, b in zip(actual, expected)
+    ), f"Expected {expected}, got {actual}"
+
+    # Clip with scalar lower bound (-inf) and upper bound (inf)
+    clip_table = table.eval_expression_list([col("data").clip(float("-inf"), float("inf"))])
+    expected = [1.0, 2.5, None, 4.7, 5.0, float("nan")]  # Data remains unchanged
+    actual = clip_table.get_column("data").to_pylist()
+    assert all(
+        (a == b) or (a is None and b is None) or (math.isnan(a) and math.isnan(b)) for a, b in zip(actual, expected)
+    ), f"Expected {expected}, got {actual}"
+
+    # Clip with None lower bound and None upper bound
+    clip_table = table.eval_expression_list([col("data").clip(None, None)])
+    expected = [1.0, 2.5, None, 4.7, 5.0, float("nan")]  # Data remains unchanged
+    actual = clip_table.get_column("data").to_pylist()
+    assert all(
+        (a == b) or (a is None and b is None) or (math.isnan(a) and math.isnan(b)) for a, b in zip(actual, expected)
+    ), f"Expected {expected}, got {actual}"
+
+    # Clip with scalar lower bound (2.0) and scalar upper bound (5.0)
+    clip_table = table.eval_expression_list([col("data").clip(2.0, 5.0)])
+    expected = [
+        2.0,  # 1.0 clipped to 2.0
+        2.5,  # 2.5 remains
+        None,  # data is None
+        4.7,  # 4.7 remains
+        5.0,  # 5.0 remains
+        float("nan"),  # data is NaN
+    ]
+    actual = clip_table.get_column("data").to_pylist()
+    assert all(
+        (a == b) or (a is None and b is None) or (math.isnan(a) and math.isnan(b)) for a, b in zip(actual, expected)
+    ), f"Expected {expected}, got {actual}"
+
+
+def test_clip_incompatible_lengths():
+    table1 = MicroPartition.from_pydict({"data": [1, 2, 3, 4, 5]})
+    table2 = MicroPartition.from_pydict({"data": [1, 2, 3]})  # Shorter array
+    table3 = MicroPartition.from_pydict({"data": [1, 2, 3, 4, 5, 6]})  # Longer array
+
+    # Test shorter lower bound
+    with pytest.raises(ValueError):
+        table1.eval_expression_list([col("data").clip(table2.get_column("data"), lit(5))])
+
+    # Test longer upper bound
+    with pytest.raises(ValueError):
+        table1.eval_expression_list([col("data").clip(lit(0), table3.get_column("data"))])
+
+    # Test both bounds with different lengths
+    with pytest.raises(ValueError):
+        table1.eval_expression_list([col("data").clip(table2.get_column("data"), table3.get_column("data"))])
+
+
+def test_clip_unsupported_types():
+    # Test with string data
+    table = MicroPartition.from_pydict({"strings": ["a", "b", "c"], "numbers": [1, 2, 3]})
+
+    # Test string column as data
+    with pytest.raises(ValueError):
+        table.eval_expression_list([col("strings").clip(0, 5)])
+
+    # Test string column as lower bound
+    with pytest.raises(ValueError):
+        table.eval_expression_list([col("numbers").clip(col("strings"), 5)])
+
+    # Test string column as upper bound
+    with pytest.raises(ValueError):
+        table.eval_expression_list([col("numbers").clip(0, col("strings"))])
+
+    # Test string literals as bounds
+    with pytest.raises(ValueError):
+        table.eval_expression_list([col("numbers").clip("a", "z")])
+
+
 def test_table_numeric_log2() -> None:
     table = MicroPartition.from_pydict({"a": [0.1, 0.01, 1.5, None], "b": [1, 10, None, None]})
     log2_table = table.eval_expression_list([col("a").log2(), col("b").log2()])
