@@ -13,7 +13,8 @@ use common_display::table_display::{make_comfy_table, StrValue};
 use common_error::{DaftError, DaftResult};
 use daft_core::{
     array::ops::{
-        full::FullNull, DaftApproxCountDistinctAggable, DaftHllSketchAggable, GroupIndices,
+        full::FullNull, DaftApproxCountDistinctAggable, DaftApproxDistinctAggable,
+        DaftHllSketchAggable, GroupIndices,
     },
     prelude::*,
 };
@@ -469,6 +470,16 @@ impl Table {
                     .map_or_else(
                         || hashed.approx_count_distinct(),
                         |groups| hashed.grouped_approx_count_distinct(groups),
+                    )?
+                    .into_series();
+                Ok(series)
+            }
+            AggExpr::ApproxDistinct(expr) => {
+                let hashed = self.eval_expression(expr)?.hash_with_validity(None)?;
+                let series = groups
+                    .map_or_else(
+                        || hashed.approx_distinct(),
+                        |groups| hashed.grouped_approx_distinct(groups),
                     )?
                     .into_series();
                 Ok(series)
